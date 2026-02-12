@@ -73,7 +73,29 @@ class _LoginScreenState extends State<LoginScreen> {
             child: StreamBuilder<List<Profile>>(
               stream: widget.profileRepository.watchProfiles(),
               builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      'Error cargando perfiles:\n${snapshot.error}',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
+
                 final profiles = snapshot.data ?? [];
+
+                if (profiles.isEmpty) {
+                  return const Center(
+                    child: Text(
+                      'No hay perfiles (o no se ha podido conectar a Firestore).',
+                      textAlign: TextAlign.center,
+                    ),
+                  );
+                }
 
                 // ✅ Si el perfil seleccionado ya no está en la lista, lo limpiamos
                 if (_selectedProfileId != null &&
