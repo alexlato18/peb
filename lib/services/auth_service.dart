@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../data/profile_repository.dart';
@@ -32,6 +33,22 @@ class AuthService {
 
   Future<String?> getSelectedProfileId() => getSavedProfileId();
 
+  Future<void> _trySaveNotificationToken(String uid) async {
+    try {
+      await _notificationTokenService.saveTokenInSession(uid: uid);
+    } catch (e) {
+      debugPrint('No se pudo guardar el token de notificaciones: $e');
+    }
+  }
+
+  Future<void> _tryClearNotificationToken(String uid) async {
+    try {
+      await _notificationTokenService.clearTokenFromSession(uid: uid);
+    } catch (e) {
+      debugPrint('No se pudo limpiar el token de notificaciones: $e');
+    }
+  }
+
   Future<bool> tryAutoLogin() async {
     final savedId = await getSavedProfileId();
     if (savedId == null) return false;
@@ -39,6 +56,7 @@ class AuthService {
     if (_auth.currentUser == null) {
       await _auth.signInAnonymously();
     }
+
     final uid = _auth.currentUser!.uid;
 
     final profile = await _profiles.getProfileById(savedId);
@@ -54,14 +72,14 @@ class AuthService {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    await _notificationTokenService.saveTokenInSession(uid: uid);
+    await _trySaveNotificationToken(uid);
 
     return true;
   }
 
   Future<void> ensureAnonymousSession() async {
-    if (FirebaseAuth.instance.currentUser != null) return;
-    await FirebaseAuth.instance.signInAnonymously();
+    if (_auth.currentUser != null) return;
+    await _auth.signInAnonymously();
   }
 
   Future<void> loginWithProfile({
@@ -71,6 +89,7 @@ class AuthService {
     if (_auth.currentUser == null) {
       await _auth.signInAnonymously();
     }
+
     final uid = _auth.currentUser!.uid;
 
     final profile = await _profiles.getProfileById(profileId);
@@ -90,7 +109,7 @@ class AuthService {
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
 
-    await _notificationTokenService.saveTokenInSession(uid: uid);
+    await _trySaveNotificationToken(uid);
   }
 
   Future<bool> isLoggedInLocally() async {
@@ -103,6 +122,7 @@ class AuthService {
       await prefs.remove(_kSelectedProfileId);
       return false;
     }
+
     return true;
   }
 
@@ -110,7 +130,7 @@ class AuthService {
     final uid = _auth.currentUser?.uid;
 
     if (uid != null) {
-      await _notificationTokenService.clearTokenFromSession(uid: uid);
+      await _tryClearNotificationToken(uid);
     }
 
     final prefs = await SharedPreferences.getInstance();
