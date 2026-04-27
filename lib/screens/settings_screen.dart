@@ -3,14 +3,12 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:image_cropper/image_cropper.dart';
-import 'dart:io';
+import 'package:peb/data/secret_tags.dart';
 
 import '../data/profile_repository.dart';
 import '../services/auth_service.dart';
 import 'bootstrap_screen.dart';
 
-// ✅ NUEVO
 import '../data/tag_style_repository.dart';
 import '../widgets/tag_chip.dart';
 
@@ -32,7 +30,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String? _profileId;
   bool _busy = false;
 
-  // ✅ NUEVO
   late final TagStyleRepository _tagStyleRepo;
 
   @override
@@ -142,7 +139,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!isValid) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('El PIN debe tener exactamente 6 dígitos.')),
+        const SnackBar(
+          content: Text('El PIN debe tener exactamente 6 dígitos.'),
+        ),
       );
       return;
     }
@@ -202,6 +201,108 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _changeVisibleTags({
+    required String profileId,
+    required List<String> tags,
+    required List<String>? currentVisibleTags,
+  }) async {
+    if (tags.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No tienes tags asignados.')),
+      );
+      return;
+    }
+
+    final selected = currentVisibleTags == null
+        ? tags.map((t) => t.trim()).where((t) => t.isNotEmpty).toSet()
+        : currentVisibleTags
+            .map((t) => t.trim())
+            .where((t) => t.isNotEmpty)
+            .toSet();
+
+    final result = await showDialog<List<String>?>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+                title: const Text('Tags visibles en el foro'),
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: tags.map((tag) {
+                      final clean = tag.trim();
+                      if (clean.isEmpty) return const SizedBox.shrink();
+
+                      final checked = selected.contains(clean);
+
+                      return CheckboxListTile(
+                        value: checked,
+                        title: Text(displayTagLabel(clean)),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            if (value == true) {
+                              selected.add(clean);
+                            } else {
+                              selected.remove(clean);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(null),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(<String>[]),
+                  child: const Text('Ocultar todos'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    final allTags = tags
+                        .map((t) => t.trim())
+                        .where((t) => t.isNotEmpty)
+                        .toList();
+
+                    Navigator.of(ctx).pop(allTags);
+                  },
+                  child: const Text('Mostrar todos'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop(selected.toList());
+                  },
+                  child: const Text('Guardar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (result == null) return;
+
+    setState(() => _busy = true);
+    try {
+      await _profileRef(profileId).update({
+        'visibleTags': result,
+      });
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tags visibles actualizados ✅')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _logout() async {
     await widget.authService.logoutLocal();
 
@@ -235,8 +336,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 final data = snapshot.data!.data() ?? {};
                 final name = (data['name'] ?? '') as String;
                 final avatarURL = data['avatarURL'] as String?;
+
                 final tags =
                     (data['tags'] as List?)?.cast<String>() ?? const <String>[];
+
+                final visibleTags = data['visibleTags'] != null
+                    ? (data['visibleTags'] as List).cast<String>()
+                    : null;
 
                 return AbsorbPointer(
                   absorbing: _busy,
@@ -276,8 +382,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       const SizedBox(height: 14),
                       Center(
                         child: InkWell(
-                          onTap: () =>
-                              _changeName(profileId: profileId, current: name),
+                          onTap: () => _changeName(
+                            profileId: profileId,
+                            current: name,
+                          ),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
@@ -296,7 +404,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                       const SizedBox(height: 10),
 
-                      // ✅ TAGS con estilos
                       Center(
                         child: tags.isEmpty
                             ? Opacity(
@@ -309,8 +416,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             : StreamBuilder<Map<String, TagStyle>>(
                                 stream: _tagStyleRepo.watchStyles(),
                                 builder: (context, snapStyles) {
-                                  final styles =
-                                      snapStyles.data ?? const <String, TagStyle>{};
+                                  final styles = snapStyles.data ??
+                                      const <String, TagStyle>{};
 
                                   return Wrap(
                                     spacing: 8,
@@ -318,8 +425,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     alignment: WrapAlignment.center,
                                     children: tags.map((t) {
                                       final clean = t.trim();
-                                      final style =
-                                          styles[clean] ?? TagStyle.fallback;
+                                      final style = resolveTagStyle(clean, styles);
 
                                       return TagChip(
                                         label: clean,
@@ -331,7 +437,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                       ),
 
+                      const SizedBox(height: 18),
+
+                      SizedBox(
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _changeVisibleTags(
+                            profileId: profileId,
+                            tags: tags,
+                            currentVisibleTags: visibleTags,
+                          ),
+                          icon: const Icon(Icons.visibility_outlined),
+                          label: Text(
+                            visibleTags == null
+                                ? 'Configurar tags visibles'
+                                : visibleTags.isEmpty
+                                    ? 'Sin tags visibles'
+                                    : 'Tags visibles: ${visibleTags.length}',
+                          ),
+                        ),
+                      ),
+
                       const SizedBox(height: 26),
+
                       SizedBox(
                         height: 48,
                         child: OutlinedButton.icon(

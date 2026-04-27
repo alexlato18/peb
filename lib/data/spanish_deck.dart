@@ -8,7 +8,7 @@ class SpanishDeck {
   SpanishDeck._(this._cards);
 
   factory SpanishDeck.shuffled40() {
-    const values = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const values = [1, 2, 3, 4, 5, 6, 7, 10, 11, 12];
     final cards = <SpanishCard>[];
 
     for (final suit in SpanishSuit.values) {
@@ -21,14 +21,20 @@ class SpanishDeck {
     return SpanishDeck._(cards);
   }
 
+  factory SpanishDeck.fromCards(List<SpanishCard> cards, {bool shuffle = false}) {
+    final cloned = List<SpanishCard>.from(cards);
+    if (shuffle) {
+      cloned.shuffle(Random());
+    }
+    return SpanishDeck._(cloned);
+  }
+
   int get remaining => _cards.length;
 
   bool get isEmpty => _cards.isEmpty;
 
-  /// Roba 1 carta sin reposición
   SpanishCard? draw() {
     if (_cards.isEmpty) return null;
-    // Ya está mezclado; podemos sacar la última
     return _cards.removeLast();
   }
 
@@ -38,4 +44,6 @@ class SpanishDeck {
       ..clear()
       ..addAll(fresh._cards);
   }
+
+  List<SpanishCard> get cardsSnapshot => List<SpanishCard>.from(_cards);
 }

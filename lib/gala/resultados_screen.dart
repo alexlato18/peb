@@ -28,6 +28,7 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
   final _momentCtrl = TextEditingController();
 
   bool get _isAdminPlus =>
+     widget.currentProfile.role == 'COMUN' ||
       widget.currentProfile.role == 'ADMIN' ||
       widget.currentProfile.role == 'ORGANIZADOR' ||
       widget.currentProfile.role == 'DIOS';
@@ -122,6 +123,20 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
 
       case ResultsSection.phrases:
         if (!_isAdminPlus) return const Center(child: Text('No autorizado'));
+        if (!_isOrganizerOrGod){
+          return _TextSection(
+          title: 'Frases del año',
+          hint: 'Añadir frase manual…',
+          controller: _phraseCtrl,
+          manualStream: Stream.value([]),
+          onAddManual: (txt) => widget.repo.addManualPhrase(
+            text: txt,
+            createdByProfileId: widget.currentProfile.id,
+          ),
+          extractFromAnswers: (answers) =>"No tienes acceso a esta información",
+          repo: widget.repo,
+        );
+        }
         return _TextSection(
           title: 'Frases del año',
           hint: 'Añadir frase manual…',
@@ -138,6 +153,20 @@ class _ResultadosScreenState extends State<ResultadosScreen> {
 
       case ResultsSection.moments:
         if (!_isAdminPlus) return const Center(child: Text('No autorizado'));
+        if (!_isOrganizerOrGod){
+          return _TextSection(
+          title: 'Momentos del año',
+          hint: 'Añadir momento manual…',
+          controller: _phraseCtrl,
+          manualStream: Stream.value([]),
+          onAddManual: (txt) => widget.repo.addManualPhrase(
+            text: txt,
+            createdByProfileId: widget.currentProfile.id,
+          ),
+          extractFromAnswers: (answers) =>"No tienes acceso a esta información",
+          repo: widget.repo,
+        );
+        }
         return _TextSection(
           title: 'Momentos del año',
           hint: 'Añadir momento manual…',

@@ -1,16 +1,17 @@
 class Profile {
   final String id;
 
-  // Ya tenías:
-  final String name;     // Firestore: name
-  final String pinHASH;  // Firestore: pinHASH
-  final String pinSalt;  // Firestore: pinSalt
+  final String name;
+  final String pinHASH;
+  final String pinSalt;
 
-  // Nuevos (existen en Firestore según tus capturas):
-  final String role;       // Firestore: role  ("COMUN", "ADMIN", "ORGANIZADOR", "DIOS")
-  final String? avatarURL; // Firestore: avatarURL
-  final List<String> tags; // Firestore: tags
-  final int counterTotal;  // Firestore: CounterTotal
+  final String role;
+  final String? avatarURL;
+  final List<String> tags;
+  final int counterTotal;
+
+  // null = nunca configurado, [] = ocultar todos, [tags] = mostrar esos
+  final List<String>? visibleTags;
 
   Profile({
     required this.id,
@@ -21,6 +22,7 @@ class Profile {
     this.avatarURL,
     this.tags = const [],
     this.counterTotal = 0,
+    this.visibleTags,
   });
 
   factory Profile.fromMap(String id, Map<String, dynamic> data) {
@@ -33,6 +35,9 @@ class Profile {
       avatarURL: data['avatarURL'] as String?,
       tags: List<String>.from(data['tags'] ?? const []),
       counterTotal: (data['CounterTotal'] as num?)?.toInt() ?? 0,
+      visibleTags: data['visibleTags'] != null
+          ? List<String>.from(data['visibleTags'])
+          : null,
     );
   }
 }

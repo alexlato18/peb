@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:peb/data/secret_tags.dart';
 
 import '../data/tag_admin_repository.dart';
 import '../data/tag_style_repository.dart';
@@ -168,14 +169,20 @@ class _TagsAdminScreenState extends State<TagsAdminScreen> {
             builder: (context, snapAllTags) {
               final globalTags = snapAllTags.data ?? const <String>[];
 
-              final tagsSet = <String>{...globalTags};
+              final tagsSet = <String>{
+                  ...globalTags.where((tag) => !isSecretTag(tag)),
+                };
 
-              for (final p in profiles) {
-                for (final t in p.tags) {
-                  final clean = t.trim();
-                  if (clean.isNotEmpty) tagsSet.add(clean);
+                for (final p in profiles) {
+                  for (final t in p.tags) {
+                    final clean = t.trim();
+                    if (clean.isNotEmpty && !isSecretTag(clean)) {
+                      tagsSet.add(clean);
+                    }
+                  }
                 }
-              }
+
+                tagsSet.removeWhere((tag) => isSecretTag(tag));
 
               final tags = tagsSet.toList()
                 ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
@@ -190,7 +197,13 @@ class _TagsAdminScreenState extends State<TagsAdminScreen> {
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
                 itemBuilder: (context, i) {
                   final tag = tags[i];
-                  final membersCount = profiles.where((p) => p.tags.contains(tag)).length;
+                  final membersCount = profiles
+                      .where(
+                        (p) => p.tags.any(
+                          (userTag) => normalizeTagKey(userTag) == normalizeTagKey(tag),
+                        ),
+                      )
+                      .length;
                   final style = styles[tag] ?? TagStyle.fallback;
 
                   return ListTile(

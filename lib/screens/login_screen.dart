@@ -20,14 +20,17 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  String? _selectedProfileId; // ✅ ahora guardamos ID, no Profile
+  String? _selectedProfileId;
   final _pinCtrl = TextEditingController();
+  final _pinFocus = FocusNode();
+
   bool _loading = false;
   String? _error;
 
   @override
   void dispose() {
     _pinCtrl.dispose();
+    _pinFocus.dispose();
     super.dispose();
   }
 
@@ -42,7 +45,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final id = _selectedProfileId!;
-      // (Opcional) sanity check
       final exists = profiles.any((p) => p.id == id);
       if (!exists) throw Exception('Perfil no válido.');
 
@@ -56,6 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+      _pinFocus.requestFocus();
     } finally {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -97,7 +100,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
                 }
 
-                // ✅ Si el perfil seleccionado ya no está en la lista, lo limpiamos
                 if (_selectedProfileId != null &&
                     profiles.isNotEmpty &&
                     !profiles.any((p) => p.id == _selectedProfileId)) {
@@ -123,10 +125,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     DropdownButtonFormField<String>(
                       value: _selectedProfileId,
                       items: profiles
-                          .map((p) => DropdownMenuItem<String>(
-                                value: p.id,
-                                child: Text(p.name),
-                              ))
+                          .map(
+                            (p) => DropdownMenuItem<String>(
+                              value: p.id,
+                              child: Text(p.name),
+                            ),
+                          )
                           .toList(),
                       onChanged: _loading
                           ? null
@@ -136,6 +140,13 @@ class _LoginScreenState extends State<LoginScreen> {
                                 _pinCtrl.clear();
                                 _error = null;
                               });
+
+                              if (id != null) {
+                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                  if (!mounted) return;
+                                  _pinFocus.requestFocus();
+                                });
+                              }
                             },
                       decoration: const InputDecoration(
                         labelText: 'Selecciona perfil',
@@ -147,16 +158,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     TextField(
                       controller: _pinCtrl,
+                      focusNode: _pinFocus,
                       enabled: _selectedProfileId != null && !_loading,
-                      keyboardType: TextInputType.number,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: false,
+                        signed: false,
+                      ),
+                      textInputAction: TextInputAction.done,
                       obscureText: true,
                       maxLength: 6,
+                      enableSuggestions: false,
+                      autocorrect: false,
+                      autofillHints: const [AutofillHints.oneTimeCode],
                       decoration: const InputDecoration(
                         labelText: 'PIN',
                         border: OutlineInputBorder(),
                         counterText: '',
                       ),
-                      onChanged: (_) => setState(() => _error = null),
+                      onChanged: (_) {
+                        if (_error != null) {
+                          setState(() => _error = null);
+                        }
+                      },
                       onSubmitted: (_) {
                         if (_canSubmit) _submit(profiles);
                       },
@@ -173,18 +196,28 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     const SizedBox(height: 16),
 
-                    SizedBox(
-                      height: 48,
-                      child: ElevatedButton(
-                        onPressed: _canSubmit ? () => _submit(profiles) : null,
-                        child: _loading
-                            ? const SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('Entrar'),
-                      ),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _pinCtrl,
+                      builder: (context, value, _) {
+                        final canSubmit =
+                            _selectedProfileId != null &&
+                            value.text.trim().isNotEmpty &&
+                            !_loading;
+
+                        return SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: canSubmit ? () => _submit(profiles) : null,
+                            child: _loading
+                                ? const SizedBox(
+                                    width: 22,
+                                    height: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Text('Entrar'),
+                          ),
+                        );
+                      },
                     ),
                   ],
                 );
