@@ -39,14 +39,26 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
   @override
   void initState() {
     super.initState();
+
     _repo = SocialRepository(
       firestore: FirebaseFirestore.instance,
       storage: FirebaseStorage.instance,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _markMessagesAsRead();
+    });
   }
 
   String get _chatId =>
       _repo.buildChatId(widget.currentProfile.id, widget.otherProfile.id);
+
+  Future<void> _markMessagesAsRead() async {
+    await _repo.markChatAsRead(
+      chatId: _chatId,
+      myProfileId: widget.currentProfile.id,
+    );
+  }
 
   Future<void> _pickImage() async {
     final xfile = await _picker.pickImage(source: ImageSource.gallery);
@@ -94,6 +106,8 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
       ),
     );
 
+    gifCtrl.dispose();
+
     if (url == null || url.isEmpty) return;
 
     setState(() {
@@ -110,6 +124,7 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
     );
 
     _textCtrl.clear();
+    await _scrollToBottom();
   }
 
   Future<void> _send() async {
@@ -146,18 +161,23 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
         _selectedMediaType = null;
       });
 
-      await Future.delayed(const Duration(milliseconds: 120));
-      if (_scrollCtrl.hasClients) {
-        _scrollCtrl.animateTo(
-          _scrollCtrl.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
-      }
+      await _scrollToBottom();
     } finally {
       if (mounted) {
         setState(() => _sending = false);
       }
+    }
+  }
+
+  Future<void> _scrollToBottom() async {
+    await Future.delayed(const Duration(milliseconds: 120));
+
+    if (_scrollCtrl.hasClients) {
+      _scrollCtrl.animateTo(
+        _scrollCtrl.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
     }
   }
 
@@ -186,6 +206,10 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
 
                 final messages = snap.data!;
 
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  _markMessagesAsRead();
+                });
+
                 if (messages.isEmpty) {
                   return const Center(
                     child: Text('No hay mensajes todavía.'),
@@ -198,8 +222,9 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                   itemCount: messages.length,
                   itemBuilder: (_, i) {
                     final msg = messages[i];
-                    final isMine =
-                        msg.senderId == widget.currentProfile.id;
+                    final isMine = msg.senderId == widget.currentProfile.id;
+                    final isReadByOther =
+                        msg.readBy.contains(widget.otherProfile.id);
 
                     return Align(
                       alignment:
@@ -227,8 +252,20 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                                 msg.mediaUrl!.isNotEmpty &&
                                 msg.text.trim().isNotEmpty)
                               const SizedBox(height: 8),
-                            if (msg.text.trim().isNotEmpty)
-                              Text(msg.text),
+                            if (msg.text.trim().isNotEmpty) Text(msg.text),
+                            if (isMine) ...[
+                              const SizedBox(height: 4),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: Icon(
+                                  isReadByOther ? Icons.done_all : Icons.done,
+                                  size: 15,
+                                  color: isReadByOther
+                                      ? Colors.blue
+                                      : Colors.black45,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
@@ -238,7 +275,6 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
               },
             ),
           ),
-
           if (_selectedFile != null)
             Container(
               width: double.infinity,
@@ -270,11 +306,10 @@ class _PrivateChatScreenState extends State<PrivateChatScreen> {
                       });
                     },
                     icon: const Icon(Icons.close),
-                  )
+                  ),
                 ],
               ),
             ),
-
           SafeArea(
             top: false,
             child: Padding(
@@ -356,49 +391,50 @@ class _MessageMediaView extends StatelessWidget {
       );
     }
 
-   if (mediaType == 'video') {
-  return GestureDetector(
-    onTap: () async {
-      try {
-        await VideoLauncher.openExternal(mediaUrl);
-      } catch (_) {
-        if (!context.mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No se pudo abrir el vídeo'),
+    if (mediaType == 'video') {
+      return GestureDetector(
+        onTap: () async {
+          try {
+            await VideoLauncher.openExternal(mediaUrl);
+          } catch (_) {
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('No se pudo abrir el vídeo'),
+              ),
+            );
+          }
+        },
+        child: Container(
+          height: 180,
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.black,
+            borderRadius: BorderRadius.circular(12),
           ),
-        );
-      }
-    },
-    child: Container(
-      height: 180,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.black,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: const Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.play_circle_fill,
-            color: Colors.white,
-            size: 58,
+          child: const Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.play_circle_fill,
+                color: Colors.white,
+                size: 58,
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Tocar para abrir vídeo',
+                style: TextStyle(color: Colors.white),
+              ),
+            ],
           ),
-          SizedBox(height: 8),
-          Text(
-            'Tocar para abrir vídeo',
-            style: TextStyle(color: Colors.white),
-          ),
-        ],
-      ),
-    ),
-  );
-}
+        ),
+      );
+    }
 
     return const SizedBox.shrink();
   }
 }
+
 class _InlineVideoPlayer extends StatefulWidget {
   const _InlineVideoPlayer({required this.url});
 
@@ -477,9 +513,8 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
       );
     }
 
-    final aspectRatio = _controller!.value.aspectRatio <= 0
-        ? 16 / 9
-        : _controller!.value.aspectRatio;
+    final aspectRatio =
+        _controller!.value.aspectRatio <= 0 ? 16 / 9 : _controller!.value.aspectRatio;
 
     return Column(
       children: [
@@ -506,15 +541,12 @@ class _InlineVideoPlayerState extends State<_InlineVideoPlayer> {
                 setState(() {});
               },
               icon: Icon(
-                _controller!.value.isPlaying
-                    ? Icons.pause
-                    : Icons.play_arrow,
+                _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
               ),
             ),
           ],
-        )
+        ),
       ],
     );
   }
 }
-

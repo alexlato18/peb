@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -98,14 +99,12 @@ class _TangoGameScreenState extends State<TangoGameScreen>
 
     final payload = challenge.payload;
     final size = (payload['size'] as num?)?.toInt() ?? 0;
-    final initialRows =
-    List<String>.from(payload['initialBoardRows'] as List? ?? const []);
-    final initialBoard = _parseBoardRows(initialRows);
-    final constraintsRaw = payload['constraints'] as List? ?? const [];
 
-    final constraints = constraintsRaw
-        .map((e) => _TangoConstraint.fromMap(Map<String, dynamic>.from(e as Map)))
-        .toList();
+    final initialRows =
+        List<String>.from(payload['initialBoardRows'] as List? ?? const []);
+    final initialBoard = _parseBoardRows(initialRows);
+
+    final constraints = _parseConstraints(payload);
 
     if (!mounted) return;
     setState(() {
@@ -120,8 +119,10 @@ class _TangoGameScreenState extends State<TangoGameScreen>
   void _applySessionIfPossible() {
     if (_challenge == null) return;
 
-    final sessionRows =
-        List<String>.from(_session?.sessionData['currentBoardRows'] as List? ?? const []);
+    final sessionRows = List<String>.from(
+      _session?.sessionData['currentBoardRows'] as List? ?? const [],
+    );
+
     final board = sessionRows.isEmpty
         ? _cloneBoard(_initialBoard)
         : _parseBoardRows(sessionRows);
@@ -132,15 +133,49 @@ class _TangoGameScreenState extends State<TangoGameScreen>
       _loading = false;
     });
   }
+
   static List<List<int?>> _parseBoardRows(List<String> rows) {
-  return rows.map((row) {
-    return row.split(',').map<int?>((cell) {
-      final value = cell.trim();
-      if (value == '_') return null;
-      return int.parse(value);
+    return rows.map((row) {
+      return row.split(',').map<int?>((cell) {
+        final value = cell.trim();
+        if (value == '_') return null;
+        return int.parse(value);
+      }).toList();
     }).toList();
-  }).toList();
-}
+  }
+
+  List<_TangoConstraint> _parseConstraints(Map<String, dynamic> payload) {
+    final constraintsRaw = payload['constraints'];
+
+    if (constraintsRaw is List) {
+      return constraintsRaw
+          .map(
+            (e) => _TangoConstraint.fromMap(
+              Map<String, dynamic>.from(e as Map),
+            ),
+          )
+          .toList();
+    }
+
+    final constraintsJson = payload['constraintsJson'];
+
+    if (constraintsJson is String && constraintsJson.trim().isNotEmpty) {
+      final decoded = jsonDecode(constraintsJson);
+
+      if (decoded is List) {
+        return decoded
+            .map(
+              (e) => _TangoConstraint.fromMap(
+                Map<String, dynamic>.from(e as Map),
+              ),
+            )
+            .toList();
+      }
+    }
+
+    return [];
+  }
+
   Future<void> _save() async {
     if (_saving) return;
 
@@ -341,12 +376,18 @@ class _TangoGameScreenState extends State<TangoGameScreen>
                                               width: cellSize,
                                               height: cellSize,
                                               child: GestureDetector(
-                                                onTap: () => _onTapCell(row, col),
+                                                onTap: () =>
+                                                    _onTapCell(row, col),
                                                 child: _TangoCell(
-                                                  value: _currentBoard[row][col],
-                                                  fixed: _isFixedCell(row, col),
+                                                  value:
+                                                      _currentBoard[row][col],
+                                                  fixed:
+                                                      _isFixedCell(row, col),
                                                   hasConflict:
-                                                      _cellHasConflict(row, col),
+                                                      _cellHasConflict(
+                                                    row,
+                                                    col,
+                                                  ),
                                                 ),
                                               ),
                                             ),
@@ -364,11 +405,6 @@ class _TangoGameScreenState extends State<TangoGameScreen>
                           ),
                         ),
                       ),
-                      if (_saving)
-                        const Padding(
-                          padding: EdgeInsets.only(bottom: 8),
-                          child: Text('Guardando...'),
-                        ),
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                         child: Card(
@@ -385,9 +421,15 @@ class _TangoGameScreenState extends State<TangoGameScreen>
                                   ),
                                 ),
                                 SizedBox(height: 8),
-                                Text('• Toca una casilla vacía para alternar: sol → luna → vacío'),
-                                Text('• = significa que ambas casillas deben ser iguales'),
-                                Text('• × significa que ambas casillas deben ser distintas'),
+                                Text(
+                                  '• Toca una casilla vacía para alternar: sol → luna → vacío',
+                                ),
+                                Text(
+                                  '• = significa que ambas casillas deben ser iguales',
+                                ),
+                                Text(
+                                  '• × significa que ambas casillas deben ser distintas',
+                                ),
                               ],
                             ),
                           ),

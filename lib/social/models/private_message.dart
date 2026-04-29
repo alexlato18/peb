@@ -8,6 +8,8 @@ class PrivateMessage {
   final String mediaType; // text | image | video | gif
   final Timestamp createdAt;
 
+  final List<String> readBy;
+
   PrivateMessage({
     required this.id,
     required this.senderId,
@@ -15,6 +17,7 @@ class PrivateMessage {
     required this.mediaUrl,
     required this.mediaType,
     required this.createdAt,
+    required this.readBy,
   });
 
   factory PrivateMessage.fromMap(String id, Map<String, dynamic> data) {
@@ -25,6 +28,7 @@ class PrivateMessage {
       mediaUrl: data['mediaUrl'] as String?,
       mediaType: (data['mediaType'] ?? 'text') as String,
       createdAt: (data['createdAt'] as Timestamp?) ?? Timestamp.now(),
+      readBy: List<String>.from(data['readBy'] as List? ?? const []),
     );
   }
 
@@ -34,7 +38,8 @@ class PrivateMessage {
       'text': text,
       'mediaUrl': mediaUrl,
       'mediaType': mediaType,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': createdAt,
+      'readBy': readBy,
     };
   }
 }

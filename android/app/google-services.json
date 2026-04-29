@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:836987084822:android:88e58dc6e88f289cced537",
+        "mobilesdk_app_id": "1:836987084822:android:1cacf81c0e1246caced537",
         "android_client_info": {
-          "package_name": "com.example.peb"
+          "package_name": "com.alexlato.peb"
         }
       },
       "oauth_client": [],

@@ -13,6 +13,7 @@ import 'package:peb/screens/music_game_setup_screen.dart';
 import 'package:peb/screens/par_impar_game_screen.dart';
 import 'package:peb/services/ghost_services.dart';
 import 'package:peb/services/secret_tag_service.dart';
+import 'package:peb/social/data/social_repository.dart';
 import 'package:peb/social/screens/social_feed_screen.dart';
 import 'package:peb/widgets/konami_detector.dart';
 import '../data/tag_admin_repository.dart' hide TagsAdminScreen;
@@ -264,21 +265,58 @@ class HomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 10),
                         ],
-                        OutlinedButton.icon(
-                          icon: const Icon(Icons.public),
-                          label: const Text("Muro social"),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SocialFeedScreen(
-                                  currentProfile: profile,
-                                  profileRepository: profileRepository,
+                       StreamBuilder<int>(
+                        stream: SocialRepository(
+                          firestore: FirebaseFirestore.instance,
+                          storage: FirebaseStorage.instance,
+                        ).watchTotalUnreadCount(profile.id),
+                        builder: (context, unreadSnap) {
+                          final unread = unreadSnap.data ?? 0;
+
+                          return OutlinedButton.icon(
+                            icon: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                const Icon(Icons.public),
+                                if (unread > 0)
+                                  Positioned(
+                                    right: -7,
+                                    top: -7,
+                                    child: Container(
+                                      width: 17,
+                                      height: 17,
+                                      alignment: Alignment.center,
+                                      decoration: const BoxDecoration(
+                                        color: Colors.red,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Text(
+                                        unread > 9 ? '9+' : '$unread',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            label: const Text("Muro social"),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => SocialFeedScreen(
+                                    currentProfile: profile,
+                                    profileRepository: profileRepository,
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
-                        ),
+                              );
+                            },
+                          );
+                        },
+                      ),
                         const SizedBox(height: 10),
                         OutlinedButton.icon(
                           icon: const Icon(Icons.sports_esports_outlined),

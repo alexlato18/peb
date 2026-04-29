@@ -8,6 +8,9 @@ class SocialPost {
   final String mediaType; // text | image | video | gif
   final Timestamp createdAt;
 
+  final List<String> likedBy;
+  final Map<String, String> reactions; // profileId -> emoji
+
   SocialPost({
     required this.id,
     required this.authorId,
@@ -15,6 +18,8 @@ class SocialPost {
     required this.mediaUrl,
     required this.mediaType,
     required this.createdAt,
+    required this.likedBy,
+    required this.reactions,
   });
 
   factory SocialPost.fromMap(String id, Map<String, dynamic> data) {
@@ -25,6 +30,10 @@ class SocialPost {
       mediaUrl: data['mediaUrl'] as String?,
       mediaType: (data['mediaType'] ?? 'text') as String,
       createdAt: (data['createdAt'] as Timestamp?) ?? Timestamp.now(),
+      likedBy: List<String>.from(data['likedBy'] as List? ?? const []),
+      reactions: Map<String, String>.from(
+        data['reactions'] as Map? ?? const {},
+      ),
     );
   }
 
@@ -34,7 +43,9 @@ class SocialPost {
       'text': text,
       'mediaUrl': mediaUrl,
       'mediaType': mediaType,
-      'createdAt': FieldValue.serverTimestamp(),
+      'createdAt': createdAt,
+      'likedBy': likedBy,
+      'reactions': reactions,
     };
   }
 }

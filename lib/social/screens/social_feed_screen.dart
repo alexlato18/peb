@@ -6,9 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:peb/data/secret_tags.dart';
 import 'package:peb/services/ghost_services.dart';
-import 'package:peb/social/screens/social_video_player_screen.dart';
 import 'package:peb/social/utils/video_launcher.dart';
-import 'package:video_player/video_player.dart';
 
 import '../../data/profile_repository.dart';
 import '../../data/tag_style_repository.dart';
@@ -57,62 +55,62 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
   }
 
   Future<Profile?> _getProfile(String profileId) async {
-    if (_profileCache.containsKey(profileId)) {
-      return _profileCache[profileId];
-    }
+    if (_profileCache.containsKey(profileId)) return _profileCache[profileId];
 
     final profile = await widget.profileRepository.getProfileById(profileId);
     _profileCache[profileId] = profile;
     return profile;
   }
+
   Future<bool?> _askAppleOffensiveQuestion() async {
-  return showDialog<bool>(
-    context: context,
-    barrierDismissible: false,
-    builder: (ctx) {
-      return AlertDialog(
-        title: const Text('Pregunta importante'),
-        content: const Text('¿Lo dices de manera ofensiva?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('No'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Sí'),
-          ),
-        ],
-      );
-    },
-  );
-}
-
-Future<void> _unlockAppleSecretTag() async {
-  final profileRef = FirebaseFirestore.instance
-      .collection('groups')
-      .doc('peb')
-      .collection('profiles')
-      .doc(widget.currentProfile.id);
-
-  final updates = <String, dynamic>{
-    'tags': FieldValue.arrayUnion([appleOffensiveTag]),
-  };
-
-  if (widget.currentProfile.visibleTags != null) {
-    updates['visibleTags'] = FieldValue.arrayUnion([appleOffensiveTag]);
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text('Pregunta importante'),
+          content: const Text('¿Lo dices de manera ofensiva?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('No'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Sí'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
-  await profileRef.update(updates);
+  Future<void> _unlockAppleSecretTag() async {
+    final profileRef = FirebaseFirestore.instance
+        .collection('groups')
+        .doc('peb')
+        .collection('profiles')
+        .doc(widget.currentProfile.id);
 
-  if (!mounted) return;
+    final updates = <String, dynamic>{
+      'tags': FieldValue.arrayUnion([appleOffensiveTag]),
+    };
 
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('Tag secreto desbloqueado: antisemita ⭐'),
-    ),
-  );
-}
+    if (widget.currentProfile.visibleTags != null) {
+      updates['visibleTags'] = FieldValue.arrayUnion([appleOffensiveTag]);
+    }
+
+    await profileRef.update(updates);
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Tag secreto desbloqueado: antisemita ⭐'),
+      ),
+    );
+  }
+
   Future<void> _pickImage() async {
     final xfile = await _picker.pickImage(source: ImageSource.gallery);
     if (xfile == null) return;
@@ -142,9 +140,7 @@ Future<void> _unlockAppleSecretTag() async {
         title: const Text('Pegar URL del GIF'),
         content: TextField(
           controller: gifCtrl,
-          decoration: const InputDecoration(
-            hintText: 'https://...',
-          ),
+          decoration: const InputDecoration(hintText: 'https://...'),
         ),
         actions: [
           TextButton(
@@ -177,59 +173,390 @@ Future<void> _unlockAppleSecretTag() async {
   }
 
   Future<void> _publishPost() async {
-  if (_posting) return;
+    if (_posting) return;
 
-  final text = _textCtrl.text.trim();
-  if (text.isEmpty && _selectedFile == null) return;
+    final text = _textCtrl.text.trim();
+    if (text.isEmpty && _selectedFile == null) return;
 
-  final containsManzana = RegExp(
-    r'(^|[^a-zA-ZáéíóúÁÉÍÓÚñÑ])judio([^a-zA-ZáéíóúÁÉÍÓÚñÑ]|$)',
-    caseSensitive: false,
-  ).hasMatch(text);
+    final containsManzana = RegExp(
+      r'(^|[^a-zA-ZáéíóúÁÉÍÓÚñÑ])judio([^a-zA-ZáéíóúÁÉÍÓÚñÑ]|$)',
+      caseSensitive: false,
+    ).hasMatch(text);
 
-  if (containsManzana) {
-    final offensive = await _askAppleOffensiveQuestion();
-
-    if (offensive == null) return;
-
-    if (offensive == true) {
-      await _unlockAppleSecretTag();
+    if (containsManzana) {
+      final offensive = await _askAppleOffensiveQuestion();
+      if (offensive == null) return;
+      if (offensive == true) await _unlockAppleSecretTag();
     }
-  }
 
-  setState(() => _posting = true);
+    setState(() => _posting = true);
 
-  try {
-    if (_selectedFile != null && _selectedMediaType != null) {
-      await _repo.createPostWithUploadedMedia(
-        authorId: widget.currentProfile.id,
-        text: text,
-        file: _selectedFile!,
-        mediaType: _selectedMediaType!,
-      );
-    } else {
-      await _repo.createPost(
-        authorId: widget.currentProfile.id,
-        text: text,
-        mediaUrl: null,
-        mediaType: 'text',
-      );
-    }
-    await GhostService(FirebaseFirestore.instance).resetBecauseUserPosted(
+    try {
+      if (_selectedFile != null && _selectedMediaType != null) {
+        await _repo.createPostWithUploadedMedia(
+          authorId: widget.currentProfile.id,
+          text: text,
+          file: _selectedFile!,
+          mediaType: _selectedMediaType!,
+        );
+      } else {
+        await _repo.createPost(
+          authorId: widget.currentProfile.id,
+          text: text,
+          mediaUrl: null,
+          mediaType: 'text',
+        );
+      }
+
+      await GhostService(FirebaseFirestore.instance).resetBecauseUserPosted(
         widget.currentProfile.id,
       );
-    _textCtrl.clear();
 
-    setState(() {
-      _selectedFile = null;
-      _selectedMediaType = null;
-    });
-  } finally {
-    if (mounted) {
-      setState(() => _posting = false);
+      _textCtrl.clear();
+
+      setState(() {
+        _selectedFile = null;
+        _selectedMediaType = null;
+      });
+    } finally {
+      if (mounted) setState(() => _posting = false);
     }
   }
-}
+
+  Future<void> _showReactions(SocialPost post) async {
+    final emojis = ['❤️', '😂', '🔥', '😮', '😡', '💀', '👏'];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (_) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
+            child: Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                ...emojis.map(
+                  (emoji) => InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () async {
+                      await _repo.setPostReaction(
+                        postId: post.id,
+                        profileId: widget.currentProfile.id,
+                        emoji: emoji,
+                      );
+                      if (mounted) Navigator.pop(context);
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(10),
+                      child: Text(
+                        emoji,
+                        style: const TextStyle(fontSize: 30),
+                      ),
+                    ),
+                  ),
+                ),
+                InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: () async {
+                    await _repo.removePostReaction(
+                      postId: post.id,
+                      profileId: widget.currentProfile.id,
+                    );
+                    if (mounted) Navigator.pop(context);
+                  },
+                  child: const Padding(
+                    padding: EdgeInsets.all(10),
+                    child: Icon(Icons.close),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openComments(SocialPost post) {
+    final ctrl = TextEditingController();
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.72,
+          minChildSize: 0.35,
+          maxChildSize: 0.92,
+          builder: (_, scrollController) {
+            return SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 8),
+                  Container(
+                    width: 44,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Respuestas',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  const Divider(),
+                  Expanded(
+                    child: StreamBuilder<List<Map<String, dynamic>>>(
+                      stream: _repo.watchPostComments(post.id),
+                      builder: (_, snap) {
+                        if (!snap.hasData) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+
+                        final comments = snap.data!;
+
+                        if (comments.isEmpty) {
+                          return const Center(
+                            child: Text('Todavía no hay respuestas.'),
+                          );
+                        }
+
+                        return ListView.builder(
+                          controller: scrollController,
+                          itemCount: comments.length,
+                          itemBuilder: (_, i) {
+                            final comment = comments[i];
+                            final authorId = (comment['authorId'] ?? '') as String;
+                            final text = (comment['text'] ?? '') as String;
+
+                            return FutureBuilder<Profile?>(
+                              future: _getProfile(authorId),
+                              builder: (_, authorSnap) {
+                                final author = authorSnap.data;
+
+                                return ListTile(
+                                  leading: CircleAvatar(
+                                    backgroundImage: author?.avatarURL != null
+                                        ? NetworkImage(author!.avatarURL!)
+                                        : null,
+                                    child: author?.avatarURL == null
+                                        ? const Icon(Icons.person)
+                                        : null,
+                                  ),
+                                  title: Text(author?.name ?? 'Usuario'),
+                                  subtitle: Text(text),
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.only(
+                      left: 12,
+                      right: 12,
+                      bottom: MediaQuery.of(sheetContext).viewInsets.bottom + 10,
+                      top: 8,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: ctrl,
+                            minLines: 1,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                              hintText: 'Responder al post...',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          onPressed: () async {
+                            final text = ctrl.text.trim();
+                            if (text.isEmpty) return;
+
+                            await _repo.addPostComment(
+                              postId: post.id,
+                              authorId: widget.currentProfile.id,
+                              text: text,
+                            );
+
+                            ctrl.clear();
+                          },
+                          icon: const Icon(Icons.send),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    ).whenComplete(ctrl.dispose);
+  }
+
+  Widget _buildReactionSummary(SocialPost post) {
+    if (post.reactions.isEmpty) return const SizedBox.shrink();
+
+    final counts = <String, int>{};
+    for (final emoji in post.reactions.values) {
+      counts[emoji] = (counts[emoji] ?? 0) + 1;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: counts.entries.map((entry) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.grey.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '${entry.key} ${entry.value}',
+              style: const TextStyle(fontSize: 12),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildPostActions(SocialPost post) {
+    final myId = widget.currentProfile.id;
+    final hasLiked = post.likedBy.contains(myId);
+    final myReaction = post.reactions[myId];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildReactionSummary(post),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () {
+                _repo.togglePostLike(postId: post.id, profileId: myId);
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(
+                      hasLiked ? Icons.favorite : Icons.favorite_border,
+                      size: 21,
+                      color: hasLiked ? Colors.red : null,
+                    ),
+                    const SizedBox(width: 4),
+                    Text('${post.likedBy.length}'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => _showReactions(post),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                child: Row(
+                  children: [
+                    Text(
+                      myReaction ?? '🙂',
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    const SizedBox(width: 4),
+                    const Text('Reaccionar'),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            InkWell(
+              borderRadius: BorderRadius.circular(999),
+              onTap: () => _openComments(post),
+              child: const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.mode_comment_outlined, size: 20),
+                    SizedBox(width: 4),
+                    Text('Responder'),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactTile(Profile user) {
+    return StreamBuilder<int>(
+      stream: _repo.watchUnreadCountWithUser(
+        myProfileId: widget.currentProfile.id,
+        otherProfileId: user.id,
+      ),
+      builder: (_, unreadSnap) {
+        final unread = unreadSnap.data ?? 0;
+
+        return ListTile(
+          leading: CircleAvatar(
+            backgroundImage:
+                user.avatarURL != null ? NetworkImage(user.avatarURL!) : null,
+            child: user.avatarURL == null ? const Icon(Icons.person) : null,
+          ),
+          title: Text(user.name),
+          subtitle: user.tags.isNotEmpty ? Text(user.tags.join(' · ')) : null,
+          trailing: unread > 0
+              ? Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    unread > 99 ? '99+' : '$unread',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              : null,
+          onTap: () {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PrivateChatScreen(
+                  currentProfile: widget.currentProfile,
+                  otherProfile: user,
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   @override
   void dispose() {
@@ -280,9 +607,7 @@ Future<void> _unlockAppleSecretTag() async {
                       stream: widget.profileRepository.watchProfiles(),
                       builder: (context, snap) {
                         if (!snap.hasData) {
-                          return const Center(
-                            child: CircularProgressIndicator(),
-                          );
+                          return const Center(child: CircularProgressIndicator());
                         }
 
                         final users = snap.data!
@@ -290,43 +615,12 @@ Future<void> _unlockAppleSecretTag() async {
                             .toList();
 
                         if (users.isEmpty) {
-                          return const Center(
-                            child: Text('No hay otros usuarios.'),
-                          );
+                          return const Center(child: Text('No hay otros usuarios.'));
                         }
 
                         return ListView.builder(
                           itemCount: users.length,
-                          itemBuilder: (_, i) {
-                            final user = users[i];
-
-                            return ListTile(
-                              leading: CircleAvatar(
-                                backgroundImage: user.avatarURL != null
-                                    ? NetworkImage(user.avatarURL!)
-                                    : null,
-                                child: user.avatarURL == null
-                                    ? const Icon(Icons.person)
-                                    : null,
-                              ),
-                              title: Text(user.name),
-                              subtitle: user.tags.isNotEmpty
-                                  ? Text(user.tags.join(' · '))
-                                  : null,
-                              onTap: () {
-                                Navigator.pop(context);
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => PrivateChatScreen(
-                                      currentProfile: widget.currentProfile,
-                                      otherProfile: user,
-                                    ),
-                                  ),
-                                );
-                              },
-                            );
-                          },
+                          itemBuilder: (_, i) => _buildContactTile(users[i]),
                         );
                       },
                     ),
@@ -443,9 +737,7 @@ Future<void> _unlockAppleSecretTag() async {
                   stream: _repo.watchPosts(),
                   builder: (context, snap) {
                     if (!snap.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(),
-                      );
+                      return const Center(child: CircularProgressIndicator());
                     }
 
                     final posts = snap.data!;
@@ -490,8 +782,7 @@ Future<void> _unlockAppleSecretTag() async {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           author?.name ?? 'Usuario',
@@ -507,7 +798,9 @@ Future<void> _unlockAppleSecretTag() async {
                                                 : author.visibleTags == null
                                                     ? author.tags
                                                     : author.visibleTags!
-                                                        .where((tag) => author.tags.contains(tag))
+                                                        .where(
+                                                          (tag) => author.tags.contains(tag),
+                                                        )
                                                         .toList();
 
                                             if (tagsToShow.isEmpty) {
@@ -521,7 +814,10 @@ Future<void> _unlockAppleSecretTag() async {
                                                 runSpacing: 8,
                                                 children: tagsToShow.map((tag) {
                                                   final clean = tag.trim();
-                                                  final style = resolveTagStyle(clean, styles);
+                                                  final style = resolveTagStyle(
+                                                    clean,
+                                                    styles,
+                                                  );
 
                                                   return TagChip(
                                                     label: clean,
@@ -544,6 +840,7 @@ Future<void> _unlockAppleSecretTag() async {
                                             mediaType: post.mediaType,
                                           ),
                                         ],
+                                        _buildPostActions(post),
                                       ],
                                     ),
                                   ),
@@ -605,6 +902,7 @@ class _PostMediaView extends StatelessWidget {
     return const SizedBox.shrink();
   }
 }
+
 class _VideoPreviewCard extends StatelessWidget {
   const _VideoPreviewCard({
     required this.mediaUrl,
@@ -621,9 +919,7 @@ class _VideoPreviewCard extends StatelessWidget {
         } catch (_) {
           if (!context.mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No se pudo abrir el vídeo'),
-            ),
+            const SnackBar(content: Text('No se pudo abrir el vídeo')),
           );
         }
       },
@@ -637,145 +933,12 @@ class _VideoPreviewCard extends StatelessWidget {
         child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.play_circle_fill,
-              color: Colors.white,
-              size: 68,
-            ),
+            Icon(Icons.play_circle_fill, color: Colors.white, size: 68),
             SizedBox(height: 10),
-            Text(
-              'Tocar para abrir vídeo',
-              style: TextStyle(color: Colors.white),
-            ),
+            Text('Tocar para abrir vídeo', style: TextStyle(color: Colors.white)),
           ],
         ),
       ),
-    );
-  }
-}
-class _PostVideoPlayer extends StatefulWidget {
-  const _PostVideoPlayer({required this.url});
-
-  final String url;
-
-  @override
-  State<_PostVideoPlayer> createState() => _PostVideoPlayerState();
-}
-
-class _PostVideoPlayerState extends State<_PostVideoPlayer> {
-  VideoPlayerController? _controller;
-  bool _ready = false;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _init();
-  }
-
-  Future<void> _init() async {
-    try {
-      final controller =
-          VideoPlayerController.networkUrl(Uri.parse(widget.url));
-
-      await controller.initialize();
-      await controller.pause();
-      await controller.setLooping(false);
-
-      if (!mounted) {
-        await controller.dispose();
-        return;
-      }
-
-      setState(() {
-        _controller = controller;
-        _ready = true;
-        _hasError = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _hasError = true;
-        _ready = false;
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller?.dispose();
-    super.dispose();
-  }
-
-  void _togglePlayPause() {
-    if (_controller == null) return;
-
-    if (_controller!.value.isPlaying) {
-      _controller!.pause();
-    } else {
-      _controller!.play();
-    }
-    setState(() {});
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_hasError) {
-      return Container(
-        height: 220,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.black12,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: const Text('No se pudo cargar el vídeo'),
-      );
-    }
-
-    if (!_ready || _controller == null) {
-      return Container(
-        height: 220,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Colors.black12,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: const CircularProgressIndicator(),
-      );
-    }
-
-    final aspectRatio = _controller!.value.aspectRatio <= 0
-        ? 16 / 9
-        : _controller!.value.aspectRatio;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            width: double.infinity,
-            color: Colors.black,
-            child: AspectRatio(
-              aspectRatio: aspectRatio,
-              child: VideoPlayer(_controller!),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            IconButton(
-              onPressed: _togglePlayPause,
-              icon: Icon(
-                _controller!.value.isPlaying
-                    ? Icons.pause
-                    : Icons.play_arrow,
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 }

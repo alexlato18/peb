@@ -964,7 +964,28 @@ class DailyGamesRepository {
       profileId: profileId,
     );
   }
+    Future<void> completeSudokuManually({
+      required String profileId,
+      required String currentBoard,
+    }) async {
+      final gameId = DailyGameId.sudoku.id;
+      final sessionId = '${gameId}_${dailyDateKey()}_$profileId';
 
+      await _sessionsCol.doc(sessionId).set({
+        'sessionData': {
+          'currentBoard': currentBoard,
+          'selectedIndex': -1,
+        },
+        'lastUpdatedAtMsUtc': DateTime.now().toUtc().millisecondsSinceEpoch,
+        'status': DailySessionStatus.inProgress.id,
+      }, SetOptions(merge: true));
+
+      await _completeGame(
+        gameId: gameId,
+        profileId: profileId,
+        attempts: 0,
+      );
+    }
   Future<String> _fetchDisplayName(String profileId) async {
     final profile = await _profileRepository.getProfileById(profileId);
     return profile?.name ?? profileId;
