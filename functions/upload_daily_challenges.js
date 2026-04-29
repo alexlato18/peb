@@ -2,10 +2,13 @@ const admin = require("firebase-admin");
 
 const serviceAccount = require("../serviceAccountKey.json");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  projectId: "pebapp-dfc40",
-});
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    projectId: "pebapp-dfc40",
+  });
+}
+
 // IMPORTA AQUÍ TUS ARRAYS ACTUALES
 // OJO: estos arrays deben estar exportados desde otro archivo, por ejemplo daily_datasets.js
 const {

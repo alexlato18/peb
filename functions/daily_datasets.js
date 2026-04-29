@@ -31961,6 +31961,7 @@ const TANGO_PUZZLES = [
 const LOL_CHAMPIONS = [
   { id: "aatrox" },
   { id: "ahri" },
+  { id: "yunara" },
   { id: "akali" },
   { id: "akshan" },
   { id: "alistar" },

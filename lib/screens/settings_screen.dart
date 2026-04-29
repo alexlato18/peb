@@ -4,6 +4,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:peb/data/secret_tags.dart';
+import 'package:peb/feedback/screens/feedback_screens.dart';
 
 import '../data/profile_repository.dart';
 import '../services/auth_service.dart';
@@ -475,6 +476,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: _logout,
                           icon: const Icon(Icons.logout),
                           label: const Text('Cerrar sesión'),
+                        ),
+                      ),
+                      
+
+                        const SizedBox(height: 14),
+                      SizedBox(
+                        height: 48,
+                        child: OutlinedButton.icon(
+                          icon: const Icon(Icons.bug_report_outlined),
+                          label: const Text('Bugs / Recomendaciones'),
+                          onPressed: () async {
+                            final profile = await widget.profileRepository.getProfileById(profileId);
+
+                            if (!context.mounted || profile == null) return;
+
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FeedbackScreen(
+                                  currentProfile: profile,
+                                  profileRepository: widget.profileRepository,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                       if (_busy) ...[

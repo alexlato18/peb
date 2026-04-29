@@ -85,14 +85,13 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
               return const Scaffold(body: Center(child: Text("No existe state/current.")));
             }
 
-            final roomPlayerIds =
-                (roomData["playerIds"] as List?)?.cast<String>() ?? <String>[];
+            final roomPlayerIds = (roomData["playerIds"] as List?)?.cast<String>() ?? <String>[];
             final isInState = s.players.any((p) => p.profileId == myId);
 
             if (!isInState) {
               final alreadyJoinedRoom = roomPlayerIds.contains(myId);
               return Scaffold(
-                appBar: AppBar(title: Text("Poker · ${widget.roomId}")),
+                appBar: AppBar(title: const Text("Poker")),
                 body: Center(
                   child: alreadyJoinedRoom
                       ? const Column(
@@ -125,6 +124,8 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
             final myTurn = s.turnProfileId == myId;
             final toCall =
                 (s.currentBet - me.betThisStreet) < 0 ? 0 : (s.currentBet - me.betThisStreet);
+
+            final maxRaiseTo = me.betThisStreet + me.stack;
 
             return StreamBuilder<List<String>>(
               stream: repo.watchMyHand(widget.roomId, myId),
@@ -182,14 +183,34 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
                             ),
                           ),
                         ),
-
                         _LocalHandPanel(
                           myHand: myHand,
                           playerName: widget.currentProfile.name,
                           stack: me.stack,
                           betThisStreet: me.betThisStreet,
                         ),
-
+                        if (me.stack == 0) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
+                            child: FilledButton.icon(
+                              onPressed: () async {
+                                try {
+                                  await repo.rebuyPlayer(
+                                    roomId: widget.roomId,
+                                    profileId: myId,
+                                  );
+                                } catch (e) {
+                                  if (!mounted) return;
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text("Error al reabastecer: $e")),
+                                  );
+                                }
+                              },
+                              icon: const Icon(Icons.restart_alt),
+                              label: const Text("Reabastecer fichas"),
+                            ),
+                          ),
+                        ],
                         Padding(
                           padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
                           child: Column(
@@ -201,17 +222,39 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontStyle: FontStyle.italic),
                               ),
-                              if (s.phase == PokerPhase.showdown && s.showdownText.isNotEmpty) ...[
+                              if (s.phase == PokerPhase.showdown &&
+                                  s.showdownText.isNotEmpty) ...[
                                 const SizedBox(height: 4),
                                 Text(
                                   s.showdownText,
                                   style: const TextStyle(fontWeight: FontWeight.w800),
                                 ),
                               ],
+                              if (s.phase == PokerPhase.showdown &&
+                                  s.showdownLines.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.all(10),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: Theme.of(context).colorScheme.surfaceContainerLow,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: s.showdownLines
+                                        .map(
+                                          (line) => Padding(
+                                            padding: const EdgeInsets.only(bottom: 4),
+                                            child: Text(line),
+                                          ),
+                                        )
+                                        .toList(),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
-
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
                           child: _ActionBar(
@@ -221,7 +264,7 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
                             meReady: me.ready,
                             toCall: toCall,
                             currentBet: s.currentBet,
-                            maxRaiseTo: me.stack + me.betThisStreet,
+                            maxRaiseTo: maxRaiseTo,
                             onReady: () async {
                               try {
                                 await repo.setReady(
@@ -283,9 +326,10 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
                               final raiseTo = await _askRaiseTo(
                                 context,
                                 s.currentBet,
-                                me.stack + me.betThisStreet,
+                                maxRaiseTo,
                               );
                               if (raiseTo == null) return;
+
                               try {
                                 await repo.submitAction(
                                   roomId: widget.roomId,
@@ -314,7 +358,6 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
                             },
                           ),
                         ),
-
                         SizedBox(
                           height: 150,
                           child: Container(
@@ -347,21 +390,28 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
     int currentBet,
     int maxRaiseTo,
   ) async {
-    final c = TextEditingController(text: (currentBet + 20).toString());
+    if (maxRaiseTo <= currentBet) {
+      return null;
+    }
+
+    final c = TextEditingController(text: maxRaiseTo.toString());
+
     return showDialog<int>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Subir a…"),
+        title: const Text("Subir"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text("Apuesta actual: $currentBet"),
-            Text("Máximo: $maxRaiseTo"),
+            Text("Puedes subir como máximo hasta: $maxRaiseTo"),
             const SizedBox(height: 8),
             TextField(
               controller: c,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "Cantidad total"),
+              decoration: const InputDecoration(
+                labelText: "Subir hasta",
+              ),
             ),
           ],
         ),
@@ -373,6 +423,24 @@ class _PokerRoomScreenState extends State<PokerRoomScreen> {
           FilledButton(
             onPressed: () {
               final v = int.tryParse(c.text.trim());
+              if (v == null) return;
+
+              if (v <= currentBet) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("La subida debe superar la apuesta actual"),
+                  ),
+                );
+                return;
+              }
+
+              if (v > maxRaiseTo) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text("No puedes subir más de $maxRaiseTo")),
+                );
+                return;
+              }
+
               Navigator.pop(context, v);
             },
             child: const Text("OK"),
@@ -473,7 +541,7 @@ class _ActionBar extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: FilledButton.tonal(
-              onPressed: myTurn ? onRaise : null,
+              onPressed: (myTurn && maxRaiseTo > currentBet) ? onRaise : null,
               child: const Text("RAISE"),
             ),
           ),
@@ -482,6 +550,7 @@ class _ActionBar extends StatelessWidget {
     );
   }
 }
+
 class _LocalHandPanel extends StatelessWidget {
   const _LocalHandPanel({
     required this.myHand,

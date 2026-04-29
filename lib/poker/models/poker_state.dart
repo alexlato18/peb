@@ -77,6 +77,7 @@ class PokerState {
     required this.showdownText,
     required this.lastActionText,
     required this.actedThisStreet,
+    required this.showdownLines,
   });
 
   final PokerPhase phase;
@@ -95,6 +96,7 @@ class PokerState {
   final String showdownText;
   final String lastActionText;
   final List<String> actedThisStreet;
+  final List<String> showdownLines;
 
   Map<String, dynamic> toMap() => {
         "phase": phase.name.toUpperCase(),
@@ -113,6 +115,7 @@ class PokerState {
         "showdownText": showdownText,
         "lastActionText": lastActionText,
         "actedThisStreet": actedThisStreet,
+        "showdownLines": showdownLines,
       };
 
   static PokerPhase _phaseFrom(String s) {
@@ -151,6 +154,7 @@ class PokerState {
         showdownText: (m["showdownText"] ?? "") as String,
         lastActionText: (m["lastActionText"] ?? "") as String,
         actedThisStreet: List<String>.from(m["actedThisStreet"] ?? const []),
+        showdownLines: List<String>.from(m["showdownLines"] ?? const []),
       );
 
   PokerState copyWith({
@@ -170,6 +174,7 @@ class PokerState {
     String? showdownText,
     String? lastActionText,
     List<String>? actedThisStreet,
+    List<String>? showdownLines,
   }) {
     return PokerState(
       phase: phase ?? this.phase,
@@ -188,6 +193,7 @@ class PokerState {
       showdownText: showdownText ?? this.showdownText,
       lastActionText: lastActionText ?? this.lastActionText,
       actedThisStreet: actedThisStreet ?? this.actedThisStreet,
+      showdownLines: showdownLines ?? this.showdownLines,
     );
   }
 

@@ -26,7 +26,7 @@ class LoldleGameScreen extends StatelessWidget {
       searchByPrefix: dataRepo.searchLolByPrefix,
       submitGuess: repository.submitLoldleGuess,
       numericLabel: 'Año',
-      groupALabel: 'Origen',
+      groupALabel: 'Región',
       groupBLabel: 'Linea',
       groupCLabel: 'Rol',
     );
