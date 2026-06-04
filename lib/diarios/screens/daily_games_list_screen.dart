@@ -4,6 +4,9 @@ import '../../data/profile_repository.dart';
 import '../models/daily_game_models.dart';
 import '../repositories/daily_games_repository.dart';
 import 'daily_game_detail_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../fish/repositories/fish_repository.dart';
+import '../../fish/screens/fish_pack_screen.dart';
 
 class DailyGamesListScreen extends StatefulWidget {
   const DailyGamesListScreen({
@@ -33,6 +36,21 @@ class _DailyGamesListScreenState extends State<DailyGamesListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Juegos diarios'),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        icon: const Icon(Icons.set_meal),
+        label: const Text('Pecera'),
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => FishPackScreen(
+                currentProfileId: widget.currentProfileId,
+                profileRepository: widget.profileRepository,
+                fishRepository: FishRepository(FirebaseFirestore.instance),
+              ),
+            ),
+          );
+        },
       ),
       body: StreamBuilder<List<DailyGameCatalogItem>>(
         stream: widget.repository.watchCatalog(),
