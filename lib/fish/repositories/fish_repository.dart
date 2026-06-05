@@ -135,11 +135,7 @@ class FishRepository {
       throw Exception('Ya has usado el sobre de hoy.');
     }
 
-    final sentFish = FishInstance(
-      id: fish.id,
-      fishId: fish.fishId,
-      shiny: fish.shiny,
-      modifiers: fish.modifiers,
+    final sentFish = fish.copyWith(
       ownerProfileId: toProfileId,
       senderProfileId: fromProfileId,
       obtainedAt: Timestamp.now(),

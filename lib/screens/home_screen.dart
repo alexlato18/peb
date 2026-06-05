@@ -39,6 +39,7 @@ class HomeScreen extends StatefulWidget  {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _menuVisible = true;
+  String? _currentFishbowlProfileId;
   void _openSettings(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -96,330 +97,439 @@ class _HomeScreenState extends State<HomeScreen> {
   );
 }
   @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<String?>(
-      future: widget.authService.getSelectedProfileId(),
-      builder: (context, snapId) {
-        final profileId = snapId.data;
+Widget build(BuildContext context) {
+  return FutureBuilder<String?>(
+    future: widget.authService.getSelectedProfileId(),
+    builder: (context, snapId) {
+      final profileId = snapId.data;
 
-        if (profileId == null) {
-          return const Scaffold(
-            body: Center(child: Text('No hay perfil seleccionado.')),
-          );
-        }
+      if (profileId == null) {
+        return const Scaffold(
+          body: Center(child: Text('No hay perfil seleccionado.')),
+        );
+      }
 
-        return FutureBuilder<Profile?>(
-          future: widget.profileRepository.getProfileById(profileId),
-          builder: (context, snapProfile) {
-            if (!snapProfile.hasData) {
-              return const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
+      return FutureBuilder<Profile?>(
+        future: widget.profileRepository.getProfileById(profileId),
+        builder: (context, snapProfile) {
+          if (!snapProfile.hasData) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final profile = snapProfile.data;
+
+          if (profile == null) {
+            return const Scaffold(
+              body: Center(child: Text('Perfil no encontrado.')),
+            );
+          }
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            GhostService(FirebaseFirestore.instance).registerSilentVisit(profile);
+          });
+
+          return StreamBuilder<List<Profile>>(
+            stream: widget.profileRepository.watchProfiles(),
+            builder: (context, profilesSnap) {
+              final profiles = profilesSnap.data ?? [profile];
+
+              _currentFishbowlProfileId ??= profile.id;
+
+              final currentIndex = profiles.indexWhere(
+                (p) => p.id == _currentFishbowlProfileId,
               );
-            }
 
-            final profile = snapProfile.data;
+              final safeIndex = currentIndex == -1 ? 0 : currentIndex;
+              final currentFishbowlProfile = profiles[safeIndex];
 
-            if (profile == null) {
-              return const Scaffold(
-                body: Center(child: Text('Perfil no encontrado.')),
-              );
-            }
+              void previousFishbowl() {
+                setState(() {
+                  final nextIndex =
+                      safeIndex == 0 ? profiles.length - 1 : safeIndex - 1;
+                  _currentFishbowlProfileId = profiles[nextIndex].id;
+                });
+              }
 
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              GhostService(FirebaseFirestore.instance).registerSilentVisit(profile);
-            });
+              void nextFishbowl() {
+                setState(() {
+                  final nextIndex =
+                      safeIndex == profiles.length - 1 ? 0 : safeIndex + 1;
+                  _currentFishbowlProfileId = profiles[nextIndex].id;
+                });
+              }
 
-            return Scaffold(
-              extendBodyBehindAppBar: true,
-              appBar: AppBar(
-                title: Text('PEB · ${profile.name}'),
-                backgroundColor: Colors.black.withOpacity(0.18),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                actions: [
-                  IconButton(
-                    icon: Icon(
-                      _menuVisible ? Icons.visibility_off : Icons.visibility,
+              return Scaffold(
+                extendBodyBehindAppBar: true,
+                appBar: AppBar(
+                  title: Text('PEB · ${profile.name}'),
+                  backgroundColor: Colors.black.withOpacity(0.18),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  actions: [
+                    IconButton(
+                      icon: Icon(
+                        _menuVisible
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _menuVisible = !_menuVisible;
+                        });
+                      },
                     ),
-                    onPressed: () {
-                      setState(() {
-                        _menuVisible = !_menuVisible;
-                      });
-                    },
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.settings),
-                    onPressed: () => _openSettings(context),
-                  ),
-                ],
-              ),
-              body: Stack(
-                children: [
-                 FishbowlBackground(
-                  profileId: profile.id,
-                  repository: FishRepository(FirebaseFirestore.instance),
-                  profileRepository: widget.profileRepository,
+                    IconButton(
+                      icon: const Icon(Icons.settings),
+                      onPressed: () => _openSettings(context),
+                    ),
+                  ],
                 ),
-IgnorePointer(
-  ignoring: !_menuVisible,
-  child: AnimatedOpacity(
-    duration: const Duration(milliseconds: 250),
-    opacity: _menuVisible ? 1 : 0,
-    child: Align(
-      alignment: Alignment.center,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 420),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-                  Align(
-                    alignment: Alignment.center,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            KonamiDetector(
-                              onCompleted: () => _unlockNerdTag(context, profile),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 18),
-                                child: Text(
-                                  'Menú PEB 2.0',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .headlineSmall
-                                      ?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        shadows: const [
-                                          Shadow(
-                                            blurRadius: 8,
-                                            color: Colors.black,
-                                          ),
-                                        ],
-                                      ),
+                body: Stack(
+                  children: [
+                    FishbowlBackground(
+                      profileId: currentFishbowlProfile.id,
+                      repository: FishRepository(FirebaseFirestore.instance),
+                      profileRepository: widget.profileRepository,
+                    ),
+                    const SizedBox(height: 10),
+                    Positioned(
+                      top: kToolbarHeight + 74,
+                      left: 16,
+                      right: 16,
+                      child: Row(
+                        children: [
+                          IconButton(
+                            onPressed: profiles.length <= 1
+                                ? null
+                                : previousFishbowl,
+                            icon: const Icon(Icons.chevron_left),
+                            color: const Color(0xFFD4AF37),
+                            style: IconButton.styleFrom(
+                              backgroundColor:
+                                  Colors.black.withOpacity(0.75),
+                            ),
+                          ),
+                          
+                          Expanded(
+                            child: Container(
+                              height: 42,
+                              alignment: Alignment.center,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.78),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFD4AF37),
+                                  width: 1.4,
+                                ),
+                              ),
+                              child: Text(
+                                currentFishbowlProfile.id == profile.id
+                                    ? 'Tu pecera'
+                                    : 'Pecera de ${currentFishbowlProfile.name}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Color(0xFFD4AF37),
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
                                 ),
                               ),
                             ),
-
-                            const SizedBox(height: 10),
-
-                            _homeButton(
-                              icon: Icons.menu_book_outlined,
-                              text:'Constitución',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => const ConstitutionScreen(),
-                                  ),
-                                );
-                              },
+                          ),
+                          IconButton(
+                            onPressed:
+                                profiles.length <= 1 ? null : nextFishbowl,
+                            icon: const Icon(Icons.chevron_right),
+                            color: const Color(0xFFD4AF37),
+                            style: IconButton.styleFrom(
+                              backgroundColor:
+                                  Colors.black.withOpacity(0.75),
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
 
-                            const SizedBox(height: 10),
-
-                            _homeButton(
-                              icon: Icons.photo_library_outlined,
-                             text:'Álbumes',
-                              onPressed: () {
-                                final eventRepo = EventRepository(
-                                  firestore: FirebaseFirestore.instance,
-                                );
-                                final photoRepo = PhotoRepository(
-                                  firestore: FirebaseFirestore.instance,
-                                  storage: FirebaseStorage.instance,
-                                );
-
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => EventsScreen(
-                                      eventRepository: eventRepo,
-                                      photoRepository: photoRepo,
-                                      profileRepository: widget.profileRepository,
-                                      currentProfile: profile,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            _homeButton(
-                              icon: Icons.emoji_events_outlined,
-                              text: 'Gala',
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => HomeGalaScreen(
-                                      currentProfile: profile,
-                                      profileRepository: widget.profileRepository,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-
-                            const SizedBox(height: 10),
-
-                            if (profile.role == 'ORGANIZADOR' ||
-                                profile.role == 'DIOS' ||
-                                profile.role == 'ADMIN') ...[
-                              _homeButton(
-                                onPressed: () {
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => TagsAdminScreen(
-                                        currentRole: profile.role,
-                                        repo: TagAdminRepository(
-                                          FirebaseFirestore.instance,
-                                        ),
+                    IgnorePointer(
+                      ignoring: !_menuVisible,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 250),
+                        opacity: _menuVisible ? 1 : 0,
+                        child: Align(
+                          alignment: Alignment.center,
+                          child: ConstrainedBox(
+                            constraints:
+                                const BoxConstraints(maxWidth: 420),
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.stretch,
+                                children: [
+                                  KonamiDetector(
+                                    onCompleted: () =>
+                                        _unlockNerdTag(context, profile),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 18,
                                       ),
-                                    ),
-                                  );
-                                },
-                                icon: Icons.sell,
-                                text:'Gestionar tags',
-                              ),
-                              const SizedBox(height: 10),
-                            ],
-
-                            StreamBuilder<int>(
-                              stream: SocialRepository(
-                                firestore: FirebaseFirestore.instance,
-                                storage: FirebaseStorage.instance,
-                              ).watchTotalUnreadCount(profile.id),
-                              builder: (context, unreadSnap) {
-                                final unread = unreadSnap.data ?? 0;
-
-                                return Center(
-                                  child: SizedBox(
-                                    width: 260,
-                                    height: 42,
-                                    child: OutlinedButton.icon(
-                                      icon: Stack(
-                                        clipBehavior: Clip.none,
-                                        children: [
-                                          const Icon(Icons.public, size: 18),
-                                          if (unread > 0)
-                                            Positioned(
-                                              right: -7,
-                                              top: -7,
-                                              child: Container(
-                                                width: 17,
-                                                height: 17,
-                                                alignment: Alignment.center,
-                                                decoration: const BoxDecoration(
-                                                  color: Colors.red,
-                                                  shape: BoxShape.circle,
+                                      child: Text(
+                                        'Menú PEB 2.0',
+                                        textAlign: TextAlign.center,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              shadows: const [
+                                                Shadow(
+                                                  blurRadius: 8,
+                                                  color: Colors.black,
                                                 ),
-                                                child: Text(
-                                                  unread > 9 ? '9+' : '$unread',
-                                                  style: const TextStyle(
-                                                    color: Colors.white,
-                                                    fontSize: 9,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                              ),
+                                              ],
                                             ),
-                                        ],
                                       ),
-                                      label: const Text("Muro social"),
-                                      style: OutlinedButton.styleFrom(
-                                        backgroundColor: Colors.black.withOpacity(0.82),
-                                        foregroundColor: const Color(0xFFD4AF37),
-                                        side: const BorderSide(
-                                          color: Color(0xFFD4AF37),
-                                          width: 1.4,
+                                    ),
+                                  ),
+
+                                  const SizedBox(height: 10),
+
+                                  _homeButton(
+                                    icon: Icons.menu_book_outlined,
+                                    text: 'Constitución',
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) =>
+                                              const ConstitutionScreen(),
                                         ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(14),
+                                      );
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 10),
+
+                                  _homeButton(
+                                    icon: Icons.photo_library_outlined,
+                                    text: 'Álbumes',
+                                    onPressed: () {
+                                      final eventRepo = EventRepository(
+                                        firestore:
+                                            FirebaseFirestore.instance,
+                                      );
+                                      final photoRepo = PhotoRepository(
+                                        firestore:
+                                            FirebaseFirestore.instance,
+                                        storage: FirebaseStorage.instance,
+                                      );
+
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => EventsScreen(
+                                            eventRepository: eventRepo,
+                                            photoRepository: photoRepo,
+                                            profileRepository:
+                                                widget.profileRepository,
+                                            currentProfile: profile,
+                                          ),
                                         ),
-                                        textStyle: const TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
+                                      );
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 10),
+
+                                  _homeButton(
+                                    icon: Icons.emoji_events_outlined,
+                                    text: 'Gala',
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => HomeGalaScreen(
+                                            currentProfile: profile,
+                                            profileRepository:
+                                                widget.profileRepository,
+                                          ),
                                         ),
-                                      ),
+                                      );
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 10),
+
+                                  if (profile.role == 'ORGANIZADOR' ||
+                                      profile.role == 'DIOS' ||
+                                      profile.role == 'ADMIN') ...[
+                                    _homeButton(
+                                      icon: Icons.sell,
+                                      text: 'Gestionar tags',
                                       onPressed: () {
-                                        Navigator.push(
-                                          context,
+                                        Navigator.of(context).push(
                                           MaterialPageRoute(
-                                            builder: (_) => SocialFeedScreen(
-                                              currentProfile: profile,
-                                              profileRepository: widget.profileRepository,
+                                            builder: (_) => TagsAdminScreen(
+                                              currentRole: profile.role,
+                                              repo: TagAdminRepository(
+                                                FirebaseFirestore.instance,
+                                              ),
                                             ),
                                           ),
                                         );
                                       },
                                     ),
+                                    const SizedBox(height: 10),
+                                  ],
+
+                                  StreamBuilder<int>(
+                                    stream: SocialRepository(
+                                      firestore:
+                                          FirebaseFirestore.instance,
+                                      storage: FirebaseStorage.instance,
+                                    ).watchTotalUnreadCount(profile.id),
+                                    builder: (context, unreadSnap) {
+                                      final unread = unreadSnap.data ?? 0;
+
+                                      return Center(
+                                        child: SizedBox(
+                                          width: 260,
+                                          height: 42,
+                                          child: OutlinedButton.icon(
+                                            icon: Stack(
+                                              clipBehavior: Clip.none,
+                                              children: [
+                                                const Icon(
+                                                  Icons.public,
+                                                  size: 18,
+                                                ),
+                                                if (unread > 0)
+                                                  Positioned(
+                                                    right: -7,
+                                                    top: -7,
+                                                    child: Container(
+                                                      width: 17,
+                                                      height: 17,
+                                                      alignment:
+                                                          Alignment.center,
+                                                      decoration:
+                                                          const BoxDecoration(
+                                                        color: Colors.red,
+                                                        shape:
+                                                            BoxShape.circle,
+                                                      ),
+                                                      child: Text(
+                                                        unread > 9
+                                                            ? '9+'
+                                                            : '$unread',
+                                                        style:
+                                                            const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 9,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                              ],
+                                            ),
+                                            label:
+                                                const Text('Muro social'),
+                                            style:
+                                                OutlinedButton.styleFrom(
+                                              backgroundColor: Colors.black
+                                                  .withOpacity(0.82),
+                                              foregroundColor:
+                                                  const Color(0xFFD4AF37),
+                                              side: const BorderSide(
+                                                color: Color(0xFFD4AF37),
+                                                width: 1.4,
+                                              ),
+                                              shape:
+                                                  RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(14),
+                                              ),
+                                              textStyle: const TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            onPressed: () {
+                                              Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      SocialFeedScreen(
+                                                    currentProfile: profile,
+                                                    profileRepository: widget
+                                                        .profileRepository,
+                                                  ),
+                                                ),
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                      );
+                                    },
                                   ),
-                                );
-                              },
-                            ),
 
-                            const SizedBox(height: 10),
+                                  const SizedBox(height: 10),
 
-                            _homeButton(
-                              icon: Icons.sports_esports_outlined,
-                             text:"Juegos",
-                              onPressed: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => HomeGamesScreen(
-                                      currentProfile: profile,
-                                      profileRepository: widget.profileRepository,
+                                  _homeButton(
+                                    icon: Icons.sports_esports_outlined,
+                                    text: 'Juegos',
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => HomeGamesScreen(
+                                            currentProfile: profile,
+                                            profileRepository:
+                                                widget.profileRepository,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+
+                                  const SizedBox(height: 25),
+
+                                  Text(
+                                    'Rol: ${profile.role}',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      shadows: [
+                                        Shadow(
+                                          blurRadius: 6,
+                                          color: Colors.black,
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                );
-                              },
-                            ),
-
-                            const SizedBox(height: 25),
-
-                            Text(
-                              'Rol: ${profile.role}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                shadows: [
-                                  Shadow(
-                                    blurRadius: 6,
-                                    color: Colors.black,
                                   ),
                                 ],
                               ),
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                              ],
-          ),
-        ),
-      ),
-    ),
-  ),
-),
-                ],
-              ),
-            );
-            
-          },
-        );
-      },
-    );
-  }
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      );
+    },
+  );
+}
 }

@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:firebase_storage/firebase_storage.dart';
@@ -26,11 +25,14 @@ class FishEditorScreen extends StatefulWidget {
 
 class _FishEditorScreenState extends State<FishEditorScreen> {
   final GlobalKey _captureKey = GlobalKey();
+
   final List<Offset?> _points = [];
   final List<_TextSticker> _texts = [];
   final List<_ImageSticker> _images = [];
 
   bool _saving = false;
+  bool _exporting = false;
+
   Color _paintColor = Colors.white;
   double _strokeWidth = 5;
 
@@ -89,7 +91,12 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
   }
 
   Future<void> _save() async {
-    setState(() => _saving = true);
+    setState(() {
+      _saving = true;
+      _exporting = true;
+    });
+
+    await Future.delayed(const Duration(milliseconds: 100));
 
     try {
       final boundary =
@@ -113,13 +120,21 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
 
       if (!mounted) return;
 
+      setState(() {
+        _exporting = false;
+      });
+
       Navigator.pop(
         context,
         widget.fish.copyWith(customImageUrl: url),
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _saving = false);
+
+      setState(() {
+        _saving = false;
+        _exporting = false;
+      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error guardando edición: $e')),
@@ -159,7 +174,6 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
       body: Column(
         children: [
           const SizedBox(height: 16),
-
           Center(
             child: RepaintBoundary(
               key: _captureKey,
@@ -183,24 +197,9 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
                       ),
                     ),
 
-                    
-
-                    CustomPaint(
-                      size: const Size(canvasSize, canvasSize),
-                      painter: _DrawingPainter(
-                        points: _points,
-                        color: _paintColor,
-                        strokeWidth: _strokeWidth,
-                      ),
-                    ),
-
                     GestureDetector(
+                      behavior: HitTestBehavior.translucent,
                       onPanUpdate: (details) {
-                        final box = context.findRenderObject() as RenderBox?;
-                        if (box == null) return;
-
-                        final local = details.localPosition;
-
                         setState(() {
                           _points.add(details.localPosition);
                         });
@@ -211,11 +210,22 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
                         });
                       },
                     ),
+
+                    CustomPaint(
+                      size: const Size(canvasSize, canvasSize),
+                      painter: _DrawingPainter(
+                        points: _points,
+                        color: _paintColor,
+                        strokeWidth: _strokeWidth,
+                      ),
+                    ),
+
                     for (final image in _images)
                       Positioned(
                         left: image.position.dx,
                         top: image.position.dy,
                         child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onPanUpdate: (details) {
                             setState(() {
                               image.position += details.delta;
@@ -234,41 +244,48 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
                                 ),
                               ),
 
-                              Positioned(
-                                right: -10,
-                                bottom: -10,
-                                child: GestureDetector(
-                                  onPanUpdate: (details) {
-                                    setState(() {
-                                      image.size += details.delta.dx;
-                                      image.size = image.size.clamp(55, 260);
-                                    });
-                                  },
-                                  child: Container(
-                                    width: 26,
-                                    height: 26,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(color: Colors.black, width: 2),
-                                    ),
-                                    child: const Icon(
-                                      Icons.open_in_full,
-                                      size: 14,
-                                      color: Colors.black,
+                              if (!_exporting)
+                                Positioned(
+                                  right: -10,
+                                  bottom: -10,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onPanUpdate: (details) {
+                                      setState(() {
+                                        image.size += details.delta.dx;
+                                        image.size = image.size.clamp(55, 260);
+                                      });
+                                    },
+                                    child: Container(
+                                      width: 26,
+                                      height: 26,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.black,
+                                          width: 2,
+                                        ),
+                                      ),
+                                      child: const Icon(
+                                        Icons.open_in_full,
+                                        size: 14,
+                                        color: Colors.black,
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
                             ],
                           ),
                         ),
                       ),
+
                     for (final text in _texts)
                       Positioned(
                         left: text.position.dx,
                         top: text.position.dy,
                         child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onPanUpdate: (details) {
                             setState(() {
                               text.position += details.delta;
@@ -295,34 +312,30 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
               ),
             ),
           ),
-
           const SizedBox(height: 20),
-
           Wrap(
             spacing: 10,
             runSpacing: 10,
             alignment: WrapAlignment.center,
             children: [
               ElevatedButton.icon(
-                onPressed: _addText,
+                onPressed: _saving ? null : _addText,
                 icon: const Icon(Icons.text_fields),
                 label: const Text('Texto'),
               ),
               ElevatedButton.icon(
-                onPressed: _addImage,
+                onPressed: _saving ? null : _addImage,
                 icon: const Icon(Icons.image),
                 label: const Text('Foto'),
               ),
               ElevatedButton.icon(
-                onPressed: _clearPaint,
+                onPressed: _saving ? null : _clearPaint,
                 icon: const Icon(Icons.delete_outline),
                 label: const Text('Borrar pintura'),
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
           Wrap(
             spacing: 8,
             children: [
@@ -358,9 +371,7 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 16),
-
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32),
             child: Row(
@@ -374,9 +385,11 @@ class _FishEditorScreenState extends State<FishEditorScreen> {
                     value: _strokeWidth,
                     min: 2,
                     max: 16,
-                    onChanged: (v) {
-                      setState(() => _strokeWidth = v);
-                    },
+                    onChanged: _saving
+                        ? null
+                        : (v) {
+                            setState(() => _strokeWidth = v);
+                          },
                   ),
                 ),
               ],
@@ -418,9 +431,9 @@ class _DrawingPainter extends CustomPainter {
   }
 
   @override
-bool shouldRepaint(covariant _DrawingPainter oldDelegate) {
-  return true;
-}
+  bool shouldRepaint(covariant _DrawingPainter oldDelegate) {
+    return true;
+  }
 }
 
 class _TextSticker {
