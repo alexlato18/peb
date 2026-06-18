@@ -39,6 +39,7 @@ class HomeScreen extends StatefulWidget  {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _menuVisible = true;
+  bool _fishEffectsEnabled = true;
   String? _currentFishbowlProfileId;
   void _openSettings(BuildContext context) {
     Navigator.of(context).push(
@@ -169,6 +170,16 @@ Widget build(BuildContext context) {
                   elevation: 0,
                   actions: [
                     IconButton(
+                        icon: Icon(
+                          _fishEffectsEnabled ? Icons.auto_awesome : Icons.auto_awesome_outlined,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _fishEffectsEnabled = !_fishEffectsEnabled;
+                          });
+                        },
+                      ),
+                    IconButton(
                       icon: Icon(
                         _menuVisible
                             ? Icons.visibility_off
@@ -192,6 +203,7 @@ Widget build(BuildContext context) {
                       profileId: currentFishbowlProfile.id,
                       repository: FishRepository(FirebaseFirestore.instance),
                       profileRepository: widget.profileRepository,
+                      effectsEnabled: _fishEffectsEnabled,
                     ),
                     const SizedBox(height: 10),
                     Positioned(

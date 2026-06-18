@@ -13,8 +13,9 @@ class FishbowlBackground extends StatelessWidget {
   required this.profileId,
   required this.repository,
   required this.profileRepository,
+  required this.effectsEnabled,
 });
-
+final bool effectsEnabled;
 final String profileId;
 final FishRepository repository;
 final ProfileRepository profileRepository;
@@ -32,13 +33,14 @@ final ProfileRepository profileRepository;
               children: [
                 const _WaterBackground(),
                 const _BubbleLayer(),
-                for (final fish in fishes.take(12))
+                for (final fish in fishes.take(1200))
                   SwimmingFish(
                     key: ValueKey(fish.id),
                     fish: fish,
                     areaWidth: constraints.maxWidth,
                     areaHeight: constraints.maxHeight,
                     profileRepository: profileRepository,
+                    effectsEnabled: effectsEnabled,
                   ),
               ],
             );
@@ -184,12 +186,13 @@ class SwimmingFish extends StatefulWidget {
     required this.areaWidth,
     required this.areaHeight,
     required this.profileRepository,
+    required this.effectsEnabled,
   });
 final ProfileRepository profileRepository;
   final FishInstance fish;
   final double areaWidth;
   final double areaHeight;
-
+  final bool effectsEnabled;
   @override
   State<SwimmingFish> createState() => _SwimmingFishState();
 }
@@ -273,7 +276,10 @@ class _SwimmingFishState extends State<SwimmingFish> {
             children: [
               SizedBox(
                 height: 230,
-                child: FishSprite(fish: widget.fish),
+                child: FishSprite(
+                  fish: widget.fish,
+                  showEffects: widget.effectsEnabled,
+                ),
               ),
               const SizedBox(height: 12),
               Text(
@@ -393,7 +399,10 @@ class _SwimmingFishState extends State<SwimmingFish> {
           child: Transform(
             alignment: Alignment.center,
             transform: Matrix4.identity()..scale(_flip ? -1.0 : 1.0, 1.0),
-            child: FishSprite(fish: widget.fish),
+            child: FishSprite(
+              fish: widget.fish,
+              showEffects: widget.effectsEnabled,
+            ),
           ),
         ),
       ),
